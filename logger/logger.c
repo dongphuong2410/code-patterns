@@ -1,43 +1,63 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <time.h>
 #include "logger.h"
 
-void _log_to_console(const char *message, va_list args);
-void _log_to_file(const char *message, va_list args);
+void _get_time(char *buffer);
 
-void (*log_fc)(const char *message, va_list args);
+FILE *fp;
+int output_type = OUT_CONSOLE;
+char *str_level[] = {"FATAL", "ERROR", "WARN", "INFO", "DEBUG"};
 
 void log_init(output_t output, ...)
 {
-    switch (output) {
-        case OUT_CONSOLE:
-            log_fc = _log_to_console;
-            break;
-        case OUT_TEXTFILE:
-            log_fc = _log_to_file;
-            break;
+    output_type = output;
+    if (output == OUT_CONSOLE) {
+        fp = stdout;
+    }
+    else {
+        va_list args;
+        va_start(args, output);
+        char *filepath = va_arg(args, char *);
+        fp = fopen(filepath, "a");
+        if (fp == NULL) {
+            fprintf(stderr, "Error open log file %s\n", filepath);
+        }
+        va_end(args);
     }
 }
 
 void log_close(void)
 {
+    if (OUT_TEXTFILE == output_type) {
+        if (fp && fp != stdout) fclose(fp);
+    }
 }
 
 void writelog(level_t level, const char *message, ...)
 {
+    char curtime[26];
+    _get_time(curtime);
+
+    fprintf(fp, "%s ", curtime);
+    fprintf(fp, "%s ", str_level[level]);
+
     va_list args;
     va_start(args, message);
-    log_fc(message, args);
+    vfprintf(fp, message, args);
     va_end(args);
+
+    fprintf(fp, "\n");
 }
 
-void _log_to_console(const char *message, va_list args)
+void _get_time(char *buffer)
 {
-    vprintf(message, args);
+    time_t timer;
+    struct tm *tm_info;
+
+    time(&timer);
+    tm_info = localtime(&timer);
+    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
 }
 
-void _log_to_file(const char *message, va_list args)
-{
-    printf("Log to file\n");
-}
