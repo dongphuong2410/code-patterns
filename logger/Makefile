@@ -2,5 +2,5 @@ CC=gcc
 CFLAGS=
 LDFLAGS=
 
-logger: main.c logger.c
+test: test.c logger.c
 	$(CC) $^ -o $@ $(CFLAGS) $(LDFLAGS)
