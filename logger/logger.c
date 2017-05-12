@@ -37,6 +37,8 @@ void log_close(void)
 
 void writelog(level_t level, const char *message, ...)
 {
+    if (level > CURRENT_LEVEL)
+        return;
     char curtime[26];
     _get_time(curtime);
 
