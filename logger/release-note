@@ -1,0 +1,1 @@
+v1.0 : simple logger , using with 5 log level (FATAL, ERROR, WARN, INFO, DEBUG), log to console or textfile
