@@ -1,0 +1,5 @@
+Parse config file module, using glib library
+Config file like this:
+
+#This is comment of config file
+filename=/path/hello
