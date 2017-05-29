@@ -8,7 +8,7 @@ $(TMP):
 	@ - [ ! -d $(TMP) ] && mkdir $(TMP)
 
 run : ready $(TESTDIR)/$(X)
-	@./$(TESTDIR)/$(X)
+	@cd $(TESTDIR); ./$(X)
 
 test_one: ready $(CMP)/$(X).want
 	@echo "Testing $X"
