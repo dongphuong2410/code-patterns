@@ -1,0 +1,29 @@
+Example of a simple unit test framework using Makefile
+Reference : https://stackoverflow.com/questions/12778430/creating-unit-testing-using-makefile
+
+### Setting method
+
+### Create folder for test file src (ex, tests)
+
+### Compile test file src into executable file
+
+### executable test file should have format : test001, test01, test1, ...
+
+### create result file to compare in $(TESTDIR)/cmp directory
+
+### Copy unittest.mk into root folder
+
+### Modify Makefile to declare TESTDIR and include unittest.mk, as follow :
+
+TESTDIR=tests
+include unittest.mk
+
+
+### Now, can call the Makefile for testing
+make test
+
+### Get the total score of test
+make score
+
+### Generate the want file to compare automatically
+make cache
