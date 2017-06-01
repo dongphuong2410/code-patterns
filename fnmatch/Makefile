@@ -2,7 +2,22 @@ CC=gcc
 CFLAGS=
 LDFLAGS=
 
-all: fnmatch
+SRC=tests
 
-fnmatch: main.c fnmatch.c
-	$(CC) $^ -o $@ $(CFLAGS) $(LDFLAGS)
+.PHONY : $(SRC) clean
+
+all: $(SRC)
+
+$(SRC):
+	$(MAKE) -C $@ clean all
+
+clean:
+	for dir in $(SRC); do\
+		$(MAKE) -C $$dir -f Makefile $@; \
+	done
+
+# define TESTDIR
+TESTDIR=tests
+
+# include unittest Makefile
+include unittest.mk
