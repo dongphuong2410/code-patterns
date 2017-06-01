@@ -17,6 +17,7 @@
 #define NODE_TYPE(list) (list->nodetypes[list->cur_node])
 #define NODE_RESET(list) list->cur_node = 0
 #define NODE_NEXT(list) list->cur_node++        //Move to next node in the list
+#define NODE_BACK(list) list->cur_node--;
 #define NODE_VISITTED_ALL(list) (list->cur_node >= list->node_cnt)
 
 typedef enum {
@@ -36,7 +37,7 @@ typedef struct _nodes {
 } nodelist_t;
 
 /**
-  * @brief Process the full path : split the directory name into nodes, identify each item type (*, ** or chars ...)
+  * @brief Process the full path : split the  file path or pattern into nodes, identify each item type (*, ** or chars ...)
   * @param str String pattern
   * @param is_pattern True if this will be used as a pattern for matching
   * @return Return nodelist_t if success, return NULL if error
@@ -156,24 +157,28 @@ node_t _find_node_type(const char *str, uint8_t start, uint8_t end)
 int _match(nodelist_t *pattern, nodelist_t *exp)
 {
     int match = 1;
-    NODE_RESET(pattern);
-    NODE_RESET(exp);
-    while (!NODE_VISITTED_ALL(exp)) {
-        if (NODE_VISITTED_ALL(pattern)) {
-            match = 0;
-            break;
-        }
-        if (!_match_cur_node(pattern, exp)) {
-            match = 0;
-            break;
-        }
+TailRecursive:
+    if (NODE_VISITTED_ALL(exp) && NODE_VISITTED_ALL(pattern))
+        return 1;
+    if (NODE_VISITTED_ALL(exp) && !NODE_VISITTED_ALL(pattern))
+        return 0;
+    if (!NODE_VISITTED_ALL(exp) && NODE_VISITTED_ALL(pattern))
+        return 0;
+    if (NODE_TYPE(pattern) == NODE_DOUBLE_STAR) {
         NODE_NEXT(pattern);
         NODE_NEXT(exp);
+        match = _match(pattern, exp);
+        if (match) return match;
+        NODE_BACK(pattern);
+        goto TailRecursive;
     }
-    if (!NODE_VISITTED_ALL(pattern)) {
-        match = 0;
+    else {
+        if (!_match_cur_node(pattern, exp))
+            return 0;
+        NODE_NEXT(pattern);
+        NODE_NEXT(exp);
+        goto TailRecursive;
     }
-    return match;
 }
 
 int _match_cur_node(nodelist_t *pattern, nodelist_t *exp)
