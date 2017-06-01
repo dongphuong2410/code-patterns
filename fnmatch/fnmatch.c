@@ -8,9 +8,16 @@
 #define MAX_PATH_LEN        256
 #define MAX_DIR_LEVEL       13
 
-#define NODE_LEN(splits, idx) (splits->item_pos[idx + 1] - splits->item_pos[idx])
-#define NODE(splits, idx) (splits->str + splits->item_pos[idx])
-#define NODE_TYPE(splits, idx) (splits->item_type[idx])
+#define MATCH 0
+#define NO_MATCH 1
+#define ERROR -1
+
+#define NODE_LEN(list) (list->offsets[list->cur_node + 1] - list->offsets[list->cur_node])
+#define NODE_ADDR(list) (list->str + list->offsets[list->cur_node])
+#define NODE_TYPE(list) (list->nodetypes[list->cur_node])
+#define NODE_RESET(list) list->cur_node = 0
+#define NODE_NEXT(list) list->cur_node++        //Move to next node in the list
+#define NODE_VISITTED_ALL(list) (list->cur_node >= list->node_cnt)
 
 typedef enum {
     NODE_INVALID,       //Invalid file/directory name or empty
@@ -18,41 +25,35 @@ typedef enum {
     NODE_STAR,          //Character *, for example /home/meo/*/
     NODE_DOUBLE_STAR,   //Double start **, represent directory recursive, for example /home/meo/**/file.txt
     NODE_MIXED_STAR     //Filename or directory name with wildcards, for example *.txt, test00*.txt ...
-} item_t;
+} node_t;
 
 typedef struct _nodes {
-    uint8_t nitems;                       //a pattern is splitted into items by '/' or '\'
-    uint8_t cur_idx;                      //current index
-    uint8_t item_pos[MAX_DIR_LEVEL];      //this array store the position of each items
-    item_t  item_type[MAX_DIR_LEVEL];     //type of items
-    char str[MAX_PATH_LEN];               //String contains pattern
+    uint8_t node_cnt;                       //a pattern is splitted into nodes by '/' or '\'
+    uint8_t cur_node;                       //current node index
+    uint8_t offsets[MAX_DIR_LEVEL];         //this array store the offset of each node in the str
+    node_t  nodetypes[MAX_DIR_LEVEL];       //type of node
+    char str[MAX_PATH_LEN];                 //Raw string
 } nodelist_t;
 
-typedef enum {
-    MATCH,
-    NOT_MATCH,
-    ERROR
-} status_t;
-
 /**
-  * @brief Process the full path : split the directory name into items, identify each item type (*, ** or chars ...)
+  * @brief Process the full path : split the directory name into nodes, identify each item type (*, ** or chars ...)
   * @param str String pattern
-  * @param is_pattern True if this is a pattern
-  * @return Return pattern struct if success, return NULL if error
+  * @param is_pattern True if this will be used as a pattern for matching
+  * @return Return nodelist_t if success, return NULL if error
   */
 nodelist_t *_translate(const char *str, uint8_t is_pattern);
 
 /**
-  * @brief Matching a filepath (splits) against a pattern
+  * @brief Matching a filepath nodelist against a pattern nodelist
   * @return 1 if matched, 0 if not matched
   */
-int _match(nodelist_t *pattern, nodelist_t *filepath);
+int _match(nodelist_t *pattern, nodelist_t *expression);
 
 /**
-  * @brief Matching a split of filepath (at fidx position) against a split of pattern (at pidx position)
+  * @brief Matching current node of a nodelist against the current node (at pidx position)
   * @return 1 if match, 0 if not match
   */
-int _match_item(nodelist_t *pattern, uint8_t pidx, nodelist_t *filepath, uint8_t fidx);
+int _match_cur_node(nodelist_t *pattern, nodelist_t *expression);
 
 /**
   * @brief Find item type of a directory/file name
@@ -60,24 +61,23 @@ int _match_item(nodelist_t *pattern, uint8_t pidx, nodelist_t *filepath, uint8_t
   * @param start : first index of the item
   * @param end : last index of the item
   */
-item_t _find_item_type(const char *str, uint8_t start, uint8_t end);
+node_t _find_node_type(const char *str, uint8_t start, uint8_t end);
 
 int fnmatch(const char *str_pattern, const char *str_filepath)
 {
-    status_t status;
     nodelist_t *pattern = _translate(str_pattern, 1);
-    nodelist_t *filepath = _translate(str_filepath, 0);
-    if (!pattern || !filepath) {
-        return -1;
+    nodelist_t *expression = _translate(str_filepath, 0);
+    if (!pattern || !expression) {
+        return ERROR;
     }
-    int match = _match(pattern, filepath);
+    int match = _match(pattern, expression);
 
     free(pattern);
-    free(filepath);
+    free(expression);
     if (match)
-        return 0;
+        return MATCH;
     else
-        return 1;
+        return NO_MATCH;
 }
 
 nodelist_t *_translate(const char *str, uint8_t is_pattern)
@@ -106,9 +106,9 @@ nodelist_t *_translate(const char *str, uint8_t is_pattern)
             }
         }
         else if (strPtr - last_slash == 1) {   //Meet first character of one item
-            pattern->item_pos[pattern->nitems] = destPtr - pattern->str;
+            pattern->offsets[pattern->node_cnt] = destPtr - pattern->str;
             *destPtr++ = ch;
-            pattern->nitems++;
+            pattern->node_cnt++;
         }   //In the middle of one item
         else {
             *destPtr++ = ch;
@@ -116,13 +116,13 @@ nodelist_t *_translate(const char *str, uint8_t is_pattern)
         strPtr++;
     }
     //Mark end of pattern
-    pattern->item_pos[pattern->nitems] = destPtr - pattern->str;
+    pattern->offsets[pattern->node_cnt] = destPtr - pattern->str;
 
     if (is_pattern) {
         //Identify item types
         int i, j;
-        for (i = 0; i < pattern->nitems; i++) {
-            pattern->item_type[i] = _find_item_type(pattern->str, pattern->item_pos[i], pattern->item_pos[i + 1]);
+        for (i = 0; i < pattern->node_cnt; i++) {
+            pattern->nodetypes[i] = _find_node_type(pattern->str, pattern->offsets[i], pattern->offsets[i + 1]);
         }
     }
     goto done;
@@ -133,7 +133,7 @@ done:
     return pattern;
 }
 
-item_t _find_item_type(const char *str, uint8_t start, uint8_t end)
+node_t _find_node_type(const char *str, uint8_t start, uint8_t end)
 {
     int len = end - start;
     if (len == 1 && str[start] == '*') {
@@ -153,37 +153,37 @@ item_t _find_item_type(const char *str, uint8_t start, uint8_t end)
     return NODE_CHARACTER;
 }
 
-int _match(nodelist_t *pattern, nodelist_t *filepath)
+int _match(nodelist_t *pattern, nodelist_t *exp)
 {
     int match = 1;
-    int pidx = 0;
-    int fidx = 0;
-    while (fidx < filepath->nitems) {
-        if (pidx >= pattern->nitems) {
+    NODE_RESET(pattern);
+    NODE_RESET(exp);
+    while (!NODE_VISITTED_ALL(exp)) {
+        if (NODE_VISITTED_ALL(pattern)) {
             match = 0;
             break;
         }
-        if (!_match_item(pattern, pidx, filepath, fidx)) {
+        if (!_match_cur_node(pattern, exp)) {
             match = 0;
             break;
         }
-        fidx++;
-        pidx++;
+        NODE_NEXT(pattern);
+        NODE_NEXT(exp);
     }
-    if (pidx < pattern->nitems) {
+    if (!NODE_VISITTED_ALL(pattern)) {
         match = 0;
     }
     return match;
 }
 
-int _match_item(nodelist_t *pattern, uint8_t pidx, nodelist_t *filepath, uint8_t fidx)
+int _match_cur_node(nodelist_t *pattern, nodelist_t *exp)
 {
-    item_t type = NODE_TYPE(pattern, pidx);
+    node_t type = NODE_TYPE(pattern);
     if (type == NODE_CHARACTER) {
-        int plen = NODE_LEN(pattern, pidx);
-        int flen = NODE_LEN(filepath, fidx);
+        int plen = NODE_LEN(pattern);
+        int flen = NODE_LEN(exp);
         if (plen == flen) {
-            int cmp = strncmp(NODE(pattern, pidx), NODE(pattern, fidx), plen);
+            int cmp = strncmp(NODE_ADDR(pattern), NODE_ADDR(pattern), plen);
             if (!cmp)
                 return 1;
         }
@@ -193,35 +193,35 @@ int _match_item(nodelist_t *pattern, uint8_t pidx, nodelist_t *filepath, uint8_t
     }
     else if (type == NODE_MIXED_STAR) {
         //TODO: For simplicity, currently just support 3  form of mixed star : abc*, *abc, a*b
-        char *start = pattern->str + pattern->item_pos[pidx];
-        char *end = pattern->str + (pattern->item_pos[pidx + 1] -1);
+        char *start = pattern->str + pattern->offsets[pattern->cur_node];
+        char *end = pattern->str + (pattern->offsets[pattern->cur_node + 1] -1);
         char *pptr, *fptr;
         int idx;
         if (*start == '*') {
-            fptr = filepath->str + (filepath->item_pos[fidx + 1] - 1);
+            fptr = exp->str + (exp->offsets[exp->cur_node + 1] - 1);
             for (pptr = end; pptr > start; pptr--, fptr--) {
                 if (*pptr != *fptr)
                     return 0;
             }
         }
         else if (*end == '*') {
-            fptr = filepath->str + filepath->item_pos[fidx];
+            fptr = exp->str + exp->offsets[exp->cur_node];
             for (pptr = start; pptr < end; pptr++, fptr++) {
                 if (*pptr != *fptr)
                     return 0;
             }
         }
         else {
-            pptr = pattern->str + pattern->item_pos[pidx];
-            fptr = filepath->str + filepath->item_pos[fidx];
+            pptr = pattern->str + pattern->offsets[pattern->cur_node];
+            fptr = exp->str + exp->offsets[exp->cur_node];
             while (*pptr != '*') {
                 if (*pptr != *fptr)
                     return 0;
                 pptr++;
                 fptr++;
             }
-            pptr = pattern->str + (pattern->item_pos[pidx + 1] - 1);
-            fptr = filepath->str + (filepath->item_pos[fidx + 1] - 1);
+            pptr = pattern->str + (pattern->offsets[pattern->cur_node + 1] - 1);
+            fptr = exp->str + (exp->offsets[exp->cur_node + 1] - 1);
             while (*pptr != '*') {
                 if (*pptr != *fptr)
                     return 0;
