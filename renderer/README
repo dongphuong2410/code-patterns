@@ -15,3 +15,6 @@ HEADER1         HEADER2         HEADER3         HEADER4
 11
 12
 
+# Dependent library 
+# glib
+$ ./sudo apt-get install libgtk2.0-dev

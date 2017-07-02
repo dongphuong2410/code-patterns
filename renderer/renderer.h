@@ -33,12 +33,6 @@ void rd_add_item(rd_t *rd, const char *item);
 int rd_print(rd_t *rd);
 
 /**
- * @brief Reset renderer to the init state
- * @param rd Handler rd_T
- */
-void rd_reset(rd_t *rd);
-
-/**
  * @brief Close the renderer, release the resource
  * @param rd Handler rd_t
  */
