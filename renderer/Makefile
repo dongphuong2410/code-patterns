@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=
+CFLAGS=-ggdb -O0
 LDFLAGS=
 
 all: renderer
