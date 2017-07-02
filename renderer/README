@@ -1,0 +1,17 @@
+# Render data as following format
+
+HEADER1         HEADER2         HEADER3         HEADER4
+-------         -------         -------         -------
+ 1              Michael         24/10/1986      Manager
+ 2              Tim             12/08/1887      Assistant
+ 3              Julien          08/11/1987      Officer
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+
